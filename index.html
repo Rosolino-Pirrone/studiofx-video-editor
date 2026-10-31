@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>StudioFX ULTRA HD - 1080p/2K 60fps Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+</head>
+<body class="bg-slate-950 text-white h-screen flex flex-col font-sans overflow-hidden select-none">
+
+  <!-- Media nascosti -->
+  <video id="fgVideo" class="hidden" crossorigin="anonymous" loop playsinline></video>
+  <video id="bgVideo" class="hidden" crossorigin="anonymous" loop muted playsinline></video>
+  <img id="bgImage" class="hidden" crossorigin="anonymous" alt="bg" />
+
+  <!-- MODAL DI ANTEPRIMA E DOWNLOAD VIDEO ESPORTATO -->
+  <div id="exportModal" class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-4 shadow-2xl flex flex-col items-center my-auto">
+      <div class="w-full flex justify-between items-center border-b border-slate-800 pb-2.5 mb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-lg">🎉</span>
+          <h2 class="font-bold text-sm text-white">Video Ultra HD Pronto!</h2>
+          <span id="exportFormatBadge" class="text-[10px] bg-emerald-600 px-2 py-0.5 rounded-full font-bold">MP4 1080p</span>
+        </div>
+        <button onclick="closeExportModal()" class="text-slate-400 hover:text-white text-xs px-2.5 py-1 rounded bg-slate-800 cursor-pointer">✕ Chiudi</button>
+      </div>
+
+      <video id="exportedVideoPreview" controls class="max-h-[250px] w-auto rounded-lg border-2 border-emerald-500/60 bg-black mb-3 shadow-lg"></video>
+
+      <div class="w-full bg-amber-950/60 border border-amber-600/60 rounded-xl p-2.5 mb-3 text-center">
+        <p class="text-xs text-amber-200 font-semibold">
+          💡 Per scaricare subito da Google AI Studio:
+        </p>
+        <p class="text-xs text-white mt-0.5">
+          Fai <b>Tasto Destro (o clic con 2 dita sul Trackpad)</b> direttamente <b>sopra il video qui sopra</b> e scegli <b>"Salva video come..."</b>!
+        </p>
+      </div>
+
+      <div class="flex gap-2 w-full">
+        <button onclick="saveVideoSmart()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-xl text-center text-xs shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5">
+          💾 Salva con Nome...
+        </button>
+        <button onclick="shareOrSaveVideo()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-3 rounded-xl text-center text-xs shadow-lg transition cursor-pointer flex items-center justify-center gap-1.5">
+          📤 Condividi / Salva Mac
+        </button>
+        <button onclick="closeExportModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2 px-3 rounded-xl text-xs transition cursor-pointer">
+          Indietro
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP NAVBAR CON SELETTORE QUALITÀ ULTRA HD -->
+  <header class="h-14 border-b border-slate-800 px-4 flex items-center justify-between bg-slate-900 shrink-0">
+    <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1.5">
+        <span class="text-xl">🎬</span>
+        <span class="font-bold text-sm tracking-wide">StudioFX <span class="text-[10px] bg-gradient-to-r from-blue-600 to-purple-600 px-2 py-0.5 rounded-full">ULTRA HD</span></span>
+      </div>
+
+      <!-- SELETTORE FORMATO (16:9 / 9:16 / 1:1) -->
+      <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800 ml-1 gap-1">
+        <button id="ratio169" onclick="setAspectRatio('16:9')" class="bg-blue-600 text-white px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer">
+          🖥️ 16:9
+        </button>
+        <button id="ratio916" onclick="setAspectRatio('9:16')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer">
+          📱 9:16
+        </button>
+        <button id="ratio11" onclick="setAspectRatio('1:1')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer">
+          ⏹️ 1:1
+        </button>
+      </div>
+
+      <!-- SELETTORE RISOLUZIONE REALE DI RENDERING (720p / 1080p / 2K) -->
+      <div class="flex items-center bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 gap-1.5">
+        <span class="text-[10px] text-emerald-400 font-bold uppercase">Qualità:</span>
+        <select id="qualitySelect" onchange="updateResolutionQuality(this.value)" class="bg-transparent text-xs font-bold text-white outline-none cursor-pointer">
+          <option value="720" class="bg-slate-900">HD 720p (8 Mbps - Veloce)</option>
+          <option value="1080" selected class="bg-slate-900">Full HD 1080p (16 Mbps - Consigliato)</option>
+          <option value="1440" class="bg-slate-900">Ultra 2K QHD (25 Mbps - Cinema)</option>
+        </select>
+      </div>
+
+      <!-- SELETTORE FPS -->
+      <select id="fpsSelect" class="bg-slate-950 border border-slate-800 text-xs font-bold text-blue-300 rounded-lg px-2 py-1.5 outline-none cursor-pointer">
+        <option value="30">30 FPS</option>
+        <option value="60" selected>60 FPS Fluidi</option>
+      </select>
+    </div>
+
+    <!-- CONTROLLI ESPORTAZIONE -->
+    <div class="flex items-center gap-2">
+      <button onclick="startDemo()" class="bg-purple-600/80 hover:bg-purple-500 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer">
+        ✨ Demo
+      </button>
+      <button onclick="startWebcam()" class="bg-emerald-600/80 hover:bg-emerald-500 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer">
+        📷 Webcam
+      </button>
+
+      <select id="exportDurationMode" class="bg-slate-950 border border-slate-700 text-xs text-slate-200 rounded-lg px-2 py-1.5 outline-none cursor-pointer">
+        <option value="manual">🔴 Manuale (Start/Stop)</option>
+        <option value="full">🎞️ Tutto il Video</option>
+        <option value="5">⏱️ Clip 5s</option>
+      </select>
+
+      <button id="exportBtn" onclick="toggleExport()" class="bg-blue-600 hover:bg-blue-500 px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-lg flex items-center gap-1.5">
+        <span>⬇️ Esporta HD</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- PANNELLO SINISTRO -->
+    <aside class="w-80 border-r border-slate-800 bg-slate-900/60 p-4 overflow-y-auto space-y-4 shrink-0">
+      
+      <!-- 1. Soggetto & AI -->
+      <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+        <h3 class="text-xs font-bold text-blue-400 uppercase mb-2">1. Soggetto & AI Eraser HD</h3>
+        <label class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg p-2 flex flex-col items-center justify-center cursor-pointer transition mb-2.5">
+          <span class="text-xs text-slate-200 font-medium">📁 Carica Video Soggetto</span>
+          <input type="file" accept="video/*" onchange="handleFgUpload(event)" class="hidden" />
+        </label>
+
+        <div class="flex items-center justify-between bg-slate-950 p-2.5 rounded-lg border border-slate-800 mb-2">
+          <div>
+            <p class="text-xs font-semibold">AI Background Eraser</p>
+            <p class="text-[11px] text-emerald-400">🟢 Scontorno Nitido HD</p>
+          </div>
+          <input type="checkbox" id="removeBgToggle" onchange="toggleRemoveBg(this.checked)" class="w-5 h-5 accent-blue-600 rounded cursor-pointer" />
+        </div>
+
+        <!-- Morbidezza Bordi AI (Feathering per evitare scalettature in Full HD) -->
+        <div class="bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800">
+          <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+            <span>✨ Morbidezza Bordi AI (Anti-Scalettatura):</span>
+            <span id="valEdgeBlur">1.5px</span>
+          </div>
+          <input type="range" min="0" max="6" step="0.5" value="1.5" oninput="updateEdgeFeather(this.value)" class="w-full accent-emerald-500 h-1.5" />
+        </div>
+
+        <div class="mt-3 space-y-1.5 border-t border-slate-800 pt-2.5">
+          <div class="flex justify-between items-center">
+            <p class="text-[11px] font-semibold text-slate-400">↔️ Posizione Soggetto</p>
+            <button onclick="centerSubject()" class="text-[10px] bg-slate-800 hover:bg-slate-700 px-2 py-0.5 rounded text-blue-300 cursor-pointer">Centra</button>
+          </div>
+          <div class="text-[11px] flex justify-between"><span>Zoom:</span> <span id="valScale">75%</span></div>
+          <input id="subScaleSlider" type="range" min="0.2" max="1.6" step="0.05" value="0.75" oninput="updateSubject('scale', this.value)" class="w-full accent-blue-500 h-1.5" />
+          
+          <div class="text-[11px] flex justify-between"><span>Posizione X:</span> <span id="valX">80px</span></div>
+          <input id="subXSlider" type="range" min="-200" max="550" value="80" oninput="updateSubject('x', this.value)" class="w-full accent-blue-500 h-1.5" />
+          
+          <div class="text-[11px] flex justify-between"><span>Posizione Y:</span> <span id="valY">40px</span></div>
+          <input id="subYSlider" type="range" min="-200" max="420" value="40" oninput="updateSubject('y', this.value)" class="w-full accent-blue-500 h-1.5" />
+        </div>
+      </div>
+
+      <!-- 2. Sostituzione Sfondo -->
+      <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+        <h3 class="text-xs font-bold text-purple-400 uppercase mb-2">2. Sostituisci Sfondo</h3>
+        <div class="grid grid-cols-2 gap-2 mb-2.5">
+          <label class="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-center cursor-pointer text-xs font-medium">
+            🖼️ Foto Sfondo
+            <input type="file" accept="image/*" onchange="handleBgUpload(event, 'image')" class="hidden" />
+          </label>
+          <label class="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-center cursor-pointer text-xs font-medium">
+            🎞️ Video Sfondo
+            <input type="file" accept="video/*" onchange="handleBgUpload(event, 'video')" class="hidden" />
+          </label>
+        </div>
+
+        <div class="mb-2.5 bg-slate-950 p-2 rounded-lg border border-slate-800">
+          <p class="text-[11px] text-slate-400 mb-1.5 font-semibold">📐 Adattamento Sfondo:</p>
+          <div class="grid grid-cols-3 gap-1">
+            <button id="fitBlurBtn" onclick="setBgFitMode('blur')" class="bg-purple-600 text-white text-[11px] py-1 rounded font-medium cursor-pointer">
+              ✨ Fit + Blur
+            </button>
+            <button id="fitContainBtn" onclick="setBgFitMode('contain')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] py-1 rounded font-medium cursor-pointer">
+              🔲 Intero
+            </button>
+            <button id="fitCoverBtn" onclick="setBgFitMode('cover')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] py-1 rounded font-medium cursor-pointer">
+              🔍 Riempi
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 pt-1">
+          <button onclick="setBgGradient()" class="text-xs bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-2.5 py-1 rounded font-medium cursor-pointer">Gradiente</button>
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs text-slate-400">Colore:</span>
+            <input type="color" value="#0f172a" oninput="setBgSolidColor(this.value)" class="w-6 h-6 rounded cursor-pointer bg-transparent" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Effetti & Transizioni -->
+      <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+        <h3 class="text-xs font-bold text-emerald-400 uppercase mb-2">3. Filtri & Transizioni</h3>
+        <div class="grid grid-cols-2 gap-1.5 mb-2">
+          <button onclick="setFilter('none')" class="bg-slate-800 hover:bg-slate-700 text-xs py-1.5 rounded cursor-pointer">Normale</button>
+          <button onclick="setFilter('grayscale(100%)')" class="bg-slate-800 hover:bg-slate-700 text-xs py-1.5 rounded cursor-pointer">B&N Cinema</button>
+          <button onclick="setFilter('sepia(85%) contrast(115%)')" class="bg-slate-800 hover:bg-slate-700 text-xs py-1.5 rounded cursor-pointer">Vintage</button>
+          <button onclick="setFilter('saturate(220%) hue-rotate(40deg)')" class="bg-slate-800 hover:bg-slate-700 text-xs py-1.5 rounded cursor-pointer">Cyberpunk</button>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="triggerTransition('fade')" class="flex-1 bg-emerald-950 border border-emerald-700 text-emerald-300 text-xs py-1 rounded cursor-pointer">⬛ Fade In</button>
+          <button onclick="triggerTransition('flash')" class="flex-1 bg-emerald-950 border border-emerald-700 text-emerald-300 text-xs py-1 rounded cursor-pointer">⚡ Flash</button>
+        </div>
+      </div>
+
+      <!-- 4. Sticker & Audio FX -->
+      <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+        <h3 class="text-xs font-bold text-amber-400 uppercase mb-2">4. Emoticon & Sound FX</h3>
+        <div class="grid grid-cols-6 gap-1 mb-3">
+          <button onclick="addSticker('😂')" class="bg-slate-800 hover:bg-slate-700 text-lg p-1 rounded cursor-pointer">😂</button>
+          <button onclick="addSticker('🔥')" class="bg-slate-800 hover:bg-slate-700 text-lg p-1 rounded cursor-pointer">🔥</button>
+          <button onclick="addSticker('❤️')" class="bg-slate-800 hover:bg-slate-700 text-lg p-1 rounded cursor-pointer">❤️</button>
+          <button onclick="addSticker('🚀')" class="bg-slate-800 hover:bg-slate-700 text-lg p-1 rounded cursor-pointer">🚀</button>
+          <button onclick="addSticker('🎉')" class="bg-slate-800 hover:bg-slate-700 text-lg p-1 rounded cursor-pointer">🎉</button>
+          <button onclick="addSticker('😎')" class="bg-slate-800 hover:bg-slate-700 text-lg p-1 rounded cursor-pointer">😎</button>
+        </div>
+        <div class="grid grid-cols-3 gap-1.5">
+          <button onclick="playSound('whoosh')" class="bg-amber-950/60 border border-amber-700/50 hover:bg-amber-900 text-amber-300 text-xs py-1.5 rounded cursor-pointer">💨 Whoosh</button>
+          <button onclick="playSound('ding')" class="bg-amber-950/60 border border-amber-700/50 hover:bg-amber-900 text-amber-300 text-xs py-1.5 rounded cursor-pointer">🔔 Ding</button>
+          <button onclick="playSound('laser')" class="bg-amber-950/60 border border-amber-700/50 hover:bg-amber-900 text-amber-300 text-xs py-1.5 rounded cursor-pointer">⚡ Laser</button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- AREA CENTRALE: CANVAS ULTRA HD + TIMELINE -->
+    <main class="flex-1 flex flex-col items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
+      <div id="recBanner" class="hidden mb-2 text-xs text-white font-bold bg-red-600 px-4 py-1 rounded-full animate-pulse flex items-center gap-2 shadow-lg">
+        <span>🔴 REGISTRAZIONE ULTRA HD IN CORSO: <span id="recTimer">0.0s</span></span>
+      </div>
+
+      <!-- Info Risoluzione Reale vs Schermo -->
+      <div class="mb-2 flex items-center gap-2 text-[11px] bg-slate-900 border border-slate-800 px-3 py-1 rounded-full text-slate-300">
+        <span>🎯 Motore Interno: <b id="resBadgeText" class="text-emerald-400">1920 x 1080 px (Full HD 16 Mbps)</b></span>
+        <span>•</span>
+        <span>Filtro Bicubico Attivo</span>
+      </div>
+      
+      <div class="relative shadow-2xl border-2 border-slate-800 rounded-xl overflow-hidden bg-black flex items-center justify-center">
+        <!-- Il Canvas ha risoluzione interna Full HD (1920x1080), ma dimensione visiva CSS comoda (640x360) -->
+        <canvas id="editorCanvas" width="1920" height="1080" style="width: 640px; height: 360px;" class="block cursor-grab active:cursor-grabbing"></canvas>
+      </div>
+
+      <!-- PLAYER CONTROLS & TIMELINE BAR -->
+      <div class="mt-3 w-[600px] max-w-full bg-slate-900 px-4 py-2 rounded-xl border border-slate-800 flex items-center gap-3">
+        <button id="playBtn" onclick="togglePlay()" class="bg-blue-600 hover:bg-blue-500 w-24 py-1.5 rounded-lg text-xs font-bold cursor-pointer shrink-0 transition">
+          ⏸ Pausa
+        </button>
+        <button onclick="restartVideos()" title="Torna all'inizio" class="bg-slate-800 hover:bg-slate-700 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer shrink-0">
+          ⏮
+        </button>
+        
+        <input id="timelineSlider" type="range" min="0" max="100" step="0.1" value="0" oninput="seekVideo(this.value)" class="flex-1 accent-blue-500 h-1.5 cursor-pointer" />
+        
+        <span id="timeDisplay" class="text-[11px] font-mono text-slate-400 w-20 text-right shrink-0">0:00 / 0:00</span>
+      </div>
+      <span id="modeBadge" class="mt-1 text-[11px] text-slate-400">✨ Modalità Demo Attiva</span>
+    </main>
+
+    <!-- PANNELLO DESTRO -->
+    <aside class="w-64 border-l border-slate-800 bg-slate-900/60 p-4 shrink-0 overflow-y-auto">
+      <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Livelli Emoticon</h3>
+      
+      <div id="stickerListContainer" class="flex gap-1.5 flex-wrap mb-4 min-h-[40px] p-2 bg-slate-950 rounded-lg border border-slate-800"></div>
+
+      <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Proprietà Selezionata</h3>
+      <div id="stickerPropsPanel" class="space-y-3 bg-slate-900 p-3.5 rounded-xl border border-slate-800">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+          <span id="activeEmojiPreview" class="text-3xl">🔥</span>
+          <button onclick="deleteActiveSticker()" class="text-xs bg-red-950 text-red-400 hover:bg-red-900 px-2.5 py-1 rounded cursor-pointer">🗑️ Elimina</button>
+        </div>
+        <div>
+          <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+            <span>Grandezza</span>
+            <span id="lblStickerSize">60px</span>
+          </div>
+          <input id="stickerSize" type="range" min="25" max="180" value="60" oninput="updateSticker('size', this.value)" class="w-full accent-blue-500 h-1.5" />
+        </div>
+        <div>
+          <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+            <span>Posizione X</span>
+            <span id="lblStickerX">190px</span>
+          </div>
+          <input id="stickerX" type="range" min="0" max="580" value="190" oninput="updateSticker('x', this.value)" class="w-full accent-blue-500 h-1.5" />
+        </div>
+        <div>
+          <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+            <span>Posizione Y</span>
+            <span id="lblStickerY">30px</span>
+          </div>
+          <input id="stickerY" type="range" min="0" max="420" value="30" oninput="updateSticker('y', this.value)" class="w-full accent-blue-500 h-1.5" />
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    const canvas = document.getElementById('editorCanvas');
+    // Richiediamo un contesto grafico ottimizzato ad alta fedeltà cromatica
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    const fgVideo = document.getElementById('fgVideo');
+    const bgVideo = document.getElementById('bgVideo');
+    const bgImage = document.getElementById('bgImage');
+
+    const aiCacheCanvas = document.createElement('canvas');
+    const aiCacheCtx = aiCacheCanvas.getContext('2d');
+    let hasAiCache = false;
+
+    let activeRecorder = null;
+    let isRecording = false;
+    let recInterval = null;
+    let recStartTime = 0;
+    let audioCtx = null;
+    let audioDest = null;
+    let fgAudioSource = null;
+
+    let lastExportBlob = null;
+    let lastExportExt = 'mp4';
+
+    // SISTEMA DI RISOLUZIONE INDIPENDENTE (Logica vs Fisica Full HD/2K)
+    // Tutte le coordinate X/Y degli slider lavorano sullo spazio logico (es. 640x360),
+    // mentre il Canvas renderizza moltiplicato per renderScale (es. x3 = 1920x1080 Full HD!)
+    let state = {
+      isPlaying: true,
+      mode: 'demo',
+      removeBg: false,
+      edgeFeather: 1.5, // Sfumatura bordi AI anti-scalettatura
+      aspectRatio: '16:9',
+      qualityTier: 1080, // 720, 1080, 1440
+      logicalW: 640,
+      logicalH: 360,
+      renderScale: 3, // 640 * 3 = 1920, 360 * 3 = 1080
+      bitrate: 16000000, // 16 Mbps di default per 1080p
+      subject: { x: 80, y: 40, scale: 0.75 },
+      bgType: 'gradient',
+      bgFitMode: 'blur',
+      bgColor: '#0f172a',
+      filter: 'none',
+      transition: { type: 'none', opacity: 0 },
+      stickers: [
+        { id: 1, content: '🔥', x: 190, y: 30, size: 60 },
+        { id: 2, content: '🎬', x: 30, y: 260, size: 55 }
+      ],
+      selectedStickerId: 1,
+      angle: 0,
+      dragging: null,
+      dragOffsetX: 0,
+      dragOffsetY: 0
+    };
+
+    // Ricalcola la risoluzione reale del Canvas in base a Formato (16:9, 9:16, 1:1) e Qualità (720p, 1080p, 2K)
+    function applyCanvasResolution() {
+      const tier = state.qualityTier;
+      let scale = 2; // 720p
+      let bps = 8000000; // 8 Mbps
+      let labelQuality = 'HD 720p (8 Mbps)';
+
+      if (tier === 1080) {
+        scale = 3; // 1080p
+        bps = 16000000; // 16 Mbps
+        labelQuality = 'Full HD 1080p (16 Mbps)';
+      } else if (tier === 1440) {
+        scale = 4; // 1440p 2K
+        bps = 25000000; // 25 Mbps
+        labelQuality = 'Ultra 2K QHD (25 Mbps)';
+      }
+
+      if (state.aspectRatio === '16:9') {
+        state.logicalW = 640;
+        state.logicalH = 360;
+      } else if (state.aspectRatio === '9:16') {
+        state.logicalW = 270;
+        state.logicalH = 480;
+        // Per il verticale 9:16 regoliamo il moltiplicatore per ottenere esattamente 720x1280, 1080x1920 o 1440x2560
+        scale = tier === 720 ? (720 / 270) : (tier === 1080 ? 4 : (1440 / 270));
+      } else {
+        state.logicalW = 400;
+        state.logicalH = 400;
+        scale = tier === 720 ? 1.8 : (tier === 1080 ? 2.7 : 3.6);
+      }
+
+      state.renderScale = scale;
+      state.bitrate = bps;
+
+      // Imposta i pixel reali di esportazione sul Canvas
+      canvas.width = Math.round(state.logicalW * scale);
+      canvas.height = Math.round(state.logicalH * scale);
+
+      // Mantieni la dimensione visiva sullo schermo comoda per lavorare
+      canvas.style.width = state.logicalW + 'px';
+      canvas.style.height = state.logicalH + 'px';
+
+      document.getElementById('resBadgeText').innerText = 
+        `${canvas.width} x ${canvas.height} px (${labelQuality})`;
+    }
+
+    function setAspectRatio(ratio) {
+      state.aspectRatio = ratio;
+      const b169 = document.getElementById('ratio169');
+      const b916 = document.getElementById('ratio916');
+      const b11 = document.getElementById('ratio11');
+      const inactive = "bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer";
+      const active = "bg-blue-600 text-white px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer";
+      
+      b169.className = ratio === '16:9' ? active : inactive;
+      b916.className = ratio === '9:16' ? active : inactive;
+      b11.className  = ratio === '1:1'  ? active : inactive;
+
+      applyCanvasResolution();
+      centerSubject();
+      state.stickers.forEach(s => {
+        s.x = Math.min(s.x, Math.max(0, state.logicalW - s.size));
+        s.y = Math.min(s.y, Math.max(0, state.logicalH - s.size));
+      });
+      renderStickerListUI();
+    }
+
+    function updateResolutionQuality(val) {
+      state.qualityTier = parseInt(val);
+      applyCanvasResolution();
+    }
+
+    function updateEdgeFeather(val) {
+      state.edgeFeather = parseFloat(val);
+      document.getElementById('valEdgeBlur').innerText = val + 'px';
+      if (state.removeBg && state.mode !== 'demo' && segmenter && fgVideo.readyState >= 2) {
+        segmenter.send({ image: fgVideo });
+      }
+    }
+
+    function ensureAudioMixer() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioDest = audioCtx.createMediaStreamDestination();
+        try {
+          fgAudioSource = audioCtx.createMediaElementSource(fgVideo);
+          fgAudioSource.connect(audioCtx.destination);
+          fgAudioSource.connect(audioDest);
+        } catch (e) {}
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function toggleExport() {
+      if (isRecording) stopExportRecording();
+      else startExportRecording();
+    }
+
+    function startExportRecording() {
+      ensureAudioMixer();
+      const mode = document.getElementById('exportDurationMode').value;
+      const fps = parseInt(document.getElementById('fpsSelect').value) || 60;
+      const btn = document.getElementById('exportBtn');
+      const banner = document.getElementById('recBanner');
+
+      if (mode === 'full' && state.mode === 'video' && fgVideo.duration) {
+        fgVideo.loop = false;
+        fgVideo.currentTime = 0;
+        if (state.bgType === 'video') bgVideo.currentTime = 0;
+        fgVideo.onended = () => {
+          if (isRecording) stopExportRecording();
+          fgVideo.loop = true;
+        };
+      }
+
+      if (!state.isPlaying) togglePlay();
+
+      // Cattura lo stream alla massima frequenza di fotogrammi scelta (30 o 60 FPS)
+      const canvasStream = canvas.captureStream(fps);
+      const combinedTracks = [
+        ...canvasStream.getVideoTracks(),
+        ...(audioDest ? audioDest.stream.getAudioTracks() : [])
+      ];
+      const finalStream = new MediaStream(combinedTracks);
+
+      // Profili High-Profile H.264 / VP9 per la massima nitidezza
+      const mimeTypes = [
+        'video/mp4;codecs=avc1.64002A,mp4a.40.2', // H.264 High Profile Level 4.2 (Full HD 60fps)
+        'video/mp4;codecs=avc1,mp4a.40.2',
+        'video/mp4',
+        'video/webm;codecs=vp9,opus',
+        'video/webm'
+      ];
+      let selectedMime = 'video/webm';
+      for (const m of mimeTypes) {
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported(m)) {
+          selectedMime = m;
+          break;
+        }
+      }
+
+      const isMp4 = selectedMime.includes('mp4');
+      const chunks = [];
+      activeRecorder = new MediaRecorder(finalStream, {
+        mimeType: selectedMime,
+        videoBitsPerSecond: state.bitrate, // Fino a 25.000.000 bps (25 Mbps)!
+        audioBitsPerSecond: 320000         // Audio 320 kbps Studio Quality
+      });
+
+      activeRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      activeRecorder.onstop = () => {
+        lastExportBlob = new Blob(chunks, { type: selectedMime });
+        lastExportExt = isMp4 ? 'mp4' : 'webm';
+        const videoUrl = URL.createObjectURL(lastExportBlob);
+        
+        const previewVid = document.getElementById('exportedVideoPreview');
+        const badge = document.getElementById('exportFormatBadge');
+
+        previewVid.src = videoUrl;
+        previewVid.play().catch(()=>{});
+        badge.innerText = `${lastExportExt.toUpperCase()} • ${canvas.width}x${canvas.height} • ${fps}FPS`;
+
+        document.getElementById('exportModal').classList.remove('hidden');
+        if (state.isPlaying) togglePlay();
+      };
+
+      activeRecorder.start(100);
+      isRecording = true;
+      recStartTime = performance.now();
+
+      btn.innerHTML = '<span>⏹️ Ferma & Salva</span>';
+      btn.className = 'bg-red-600 hover:bg-red-500 px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-lg animate-pulse flex items-center gap-1.5';
+      banner.classList.remove('hidden');
+
+      recInterval = setInterval(() => {
+        const elapsed = ((performance.now() - recStartTime) / 1000).toFixed(1);
+        document.getElementById('recTimer').innerText = elapsed + 's';
+      }, 100);
+
+      if (mode === '5') {
+        setTimeout(() => {
+          if (isRecording) stopExportRecording();
+        }, 5000);
+      }
+    }
+
+    function stopExportRecording() {
+      if (activeRecorder && activeRecorder.state !== 'inactive') {
+        activeRecorder.stop();
+      }
+      isRecording = false;
+      clearInterval(recInterval);
+      fgVideo.loop = true;
+
+      const btn = document.getElementById('exportBtn');
+      btn.innerHTML = '<span>⬇️ Esporta HD</span>';
+      btn.className = 'bg-blue-600 hover:bg-blue-500 px-3.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer shadow-lg flex items-center gap-1.5';
+      document.getElementById('recBanner').classList.add('hidden');
+    }
+
+    async function saveVideoSmart() {
+      if (!lastExportBlob) return;
+      const fileName = `StudioFX-${canvas.width}x${canvas.height}-${Date.now()}.${lastExportExt}`;
+
+      if (window.showSaveFilePicker) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: fileName,
+            types: [{
+              description: 'File Video Ultra HD',
+              accept: { [lastExportBlob.type.split(';')[0]]: ['.' + lastExportExt] }
+            }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(lastExportBlob);
+          await writable.close();
+          return;
+        } catch (err) {}
+      }
+
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(lastExportBlob);
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    async function shareOrSaveVideo() {
+      if (!lastExportBlob) return;
+      const fileName = `StudioFX-${canvas.width}x${canvas.height}-${Date.now()}.${lastExportExt}`;
+      const file = new File([lastExportBlob], fileName, { type: lastExportBlob.type.split(';')[0] });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'StudioFX Ultra HD Video' });
+          return;
+        } catch (e) {}
+      }
+      saveVideoSmart();
+    }
+
+    function closeExportModal() {
+      const previewVid = document.getElementById('exportedVideoPreview');
+      previewVid.pause();
+      document.getElementById('exportModal').classList.add('hidden');
+    }
+
+    function setBgFitMode(mode) {
+      state.bgFitMode = mode;
+      const bBlur = document.getElementById('fitBlurBtn');
+      const bContain = document.getElementById('fitContainBtn');
+      const bCover = document.getElementById('fitCoverBtn');
+      const inactive = "bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] py-1 rounded font-medium cursor-pointer";
+      const active = "bg-purple-600 text-white text-[11px] py-1 rounded font-medium cursor-pointer";
+
+      bBlur.className = mode === 'blur' ? active : inactive;
+      bContain.className = mode === 'contain' ? active : inactive;
+      bCover.className = mode === 'cover' ? active : inactive;
+    }
+
+    // Calcola le dimensioni logiche del Soggetto
+    function getSubjectDimensions() {
+      let srcW = 640;
+      let srcH = 360;
+      if (state.mode !== 'demo' && fgVideo.videoWidth && fgVideo.videoHeight) {
+        srcW = fgVideo.videoWidth;
+        srcH = fgVideo.videoHeight;
+      }
+      const baseScale = Math.min(state.logicalW / srcW, state.logicalH / srcH);
+      return {
+        w: srcW * baseScale * state.subject.scale,
+        h: srcH * baseScale * state.subject.scale
+      };
+    }
+
+    function centerSubject() {
+      const dims = getSubjectDimensions();
+      state.subject.x = Math.round((state.logicalW - dims.w) / 2);
+      state.subject.y = Math.round((state.logicalH - dims.h) / 2);
+      document.getElementById('subXSlider').value = state.subject.x;
+      document.getElementById('subYSlider').value = state.subject.y;
+      document.getElementById('valX').innerText = state.subject.x + 'px';
+      document.getElementById('valY').innerText = state.subject.y + 'px';
+    }
+
+    function drawMediaWithAspectRatio(ctx, media, srcW, srcH, destW, destH, mode) {
+      if (!srcW || !srcH) return;
+      const srcRatio = srcW / srcH;
+      const destRatio = destW / destH;
+
+      if (mode === 'cover') {
+        let drawW, drawH, offsetX, offsetY;
+        if (srcRatio > destRatio) {
+          drawH = destH; drawW = destH * srcRatio;
+          offsetX = (destW - drawW) / 2; offsetY = 0;
+        } else {
+          drawW = destW; drawH = destW / srcRatio;
+          offsetX = 0; offsetY = (destH - drawH) / 2;
+        }
+        ctx.drawImage(media, offsetX, offsetY, drawW, drawH);
+      } else {
+        if (mode === 'blur') {
+          ctx.save();
+          let bgW, bgH, bgX, bgY;
+          if (srcRatio > destRatio) {
+            bgH = destH; bgW = destH * srcRatio;
+            bgX = (destW - bgW) / 2; bgY = 0;
+          } else {
+            bgW = destW; bgH = destW / srcRatio;
+            bgX = 0; bgY = (destH - bgH) / 2;
+          }
+          const prevFilter = ctx.filter === 'none' ? '' : ctx.filter + ' ';
+          ctx.filter = prevFilter + 'blur(20px) brightness(0.55)';
+          ctx.drawImage(media, bgX - 20, bgY - 20, bgW + 40, bgH + 40);
+          ctx.restore();
+        } else {
+          ctx.fillStyle = state.bgColor;
+          ctx.fillRect(0, 0, destW, destH);
+        }
+
+        let drawW, drawH, offsetX, offsetY;
+        if (srcRatio > destRatio) {
+          drawW = destW; drawH = destW / srcRatio;
+          offsetX = 0; offsetY = (destH - drawH) / 2;
+        } else {
+          drawH = destH; drawW = destH * srcRatio;
+          offsetX = (destW - drawW) / 2; offsetY = 0;
+        }
+        ctx.drawImage(media, offsetX, offsetY, drawW, drawH);
+      }
+    }
+
+    function formatTime(sec) {
+      if (!sec || isNaN(sec) || !isFinite(sec)) return "0:00";
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return m + ":" + (s < 10 ? "0" + s : s);
+    }
+
+    function updateTimelineUI() {
+      const activeVid = state.mode === 'video' ? fgVideo : (state.bgType === 'video' ? bgVideo : null);
+      const slider = document.getElementById('timelineSlider');
+      const display = document.getElementById('timeDisplay');
+
+      if (activeVid && activeVid.duration && isFinite(activeVid.duration)) {
+        slider.max = activeVid.duration;
+        slider.value = activeVid.currentTime;
+        display.innerText = formatTime(activeVid.currentTime) + " / " + formatTime(activeVid.duration);
+      } else {
+        display.innerText = state.isPlaying ? "LIVE" : "PAUSA";
+      }
+    }
+
+    async function seekVideo(val) {
+      const time = parseFloat(val);
+      if (state.mode === 'video' && fgVideo.duration) fgVideo.currentTime = time;
+      if (state.bgType === 'video' && bgVideo.duration) bgVideo.currentTime = time % bgVideo.duration;
+      updateTimelineUI();
+    }
+
+    fgVideo.addEventListener('seeked', async () => {
+      if (state.removeBg && segmenter && fgVideo.readyState >= 2) {
+        await segmenter.send({ image: fgVideo });
+      }
+    });
+
+    function restartVideos() {
+      if (state.mode === 'video') fgVideo.currentTime = 0;
+      if (state.bgType === 'video') bgVideo.currentTime = 0;
+      state.angle = 0;
+      updateTimelineUI();
+    }
+
+    function updatePlayBtnUI() {
+      const btn = document.getElementById('playBtn');
+      if (state.isPlaying) {
+        btn.innerText = '⏸ Pausa';
+        btn.className = 'bg-blue-600 hover:bg-blue-500 w-24 py-1.5 rounded-lg text-xs font-bold cursor-pointer shrink-0 transition';
+      } else {
+        btn.innerText = '▶️ Play';
+        btn.className = 'bg-emerald-600 hover:bg-emerald-500 w-24 py-1.5 rounded-lg text-xs font-bold cursor-pointer shrink-0 transition';
+      }
+    }
+
+    function togglePlay() {
+      state.isPlaying = !state.isPlaying;
+      if (state.isPlaying) {
+        if (state.mode !== 'demo' && fgVideo.src) fgVideo.play().catch(()=>{});
+        if (state.mode === 'webcam' && fgVideo.srcObject) fgVideo.play().catch(()=>{});
+        if (state.bgType === 'video' && bgVideo.src) bgVideo.play().catch(()=>{});
+      } else {
+        fgVideo.pause();
+        bgVideo.pause();
+      }
+      updatePlayBtnUI();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') {
+        e.preventDefault();
+        togglePlay();
+      }
+    });
+
+    function renderStickerListUI() {
+      const container = document.getElementById('stickerListContainer');
+      container.innerHTML = '';
+
+      if (state.stickers.length === 0) {
+        container.innerHTML = '<span class="text-[11px] text-slate-500">Nessuna emoticon</span>';
+        document.getElementById('activeEmojiPreview').innerText = '-';
+        return;
+      }
+
+      state.stickers.forEach(st => {
+        const btn = document.createElement('button');
+        const isSel = st.id === state.selectedStickerId;
+        btn.className = "p-1.5 rounded-lg text-lg border transition cursor-pointer " + 
+          (isSel ? "border-blue-400 bg-blue-950/70 scale-105 shadow" : "border-slate-800 bg-slate-900 hover:bg-slate-800");
+        btn.innerText = st.content;
+        btn.onclick = () => selectSticker(st.id);
+        container.appendChild(btn);
+      });
+
+      const active = state.stickers.find(s => s.id === state.selectedStickerId);
+      if (active) {
+        document.getElementById('activeEmojiPreview').innerText = active.content;
+        document.getElementById('stickerSize').value = active.size;
+        document.getElementById('stickerX').value = Math.round(active.x);
+        document.getElementById('stickerY').value = Math.round(active.y);
+        document.getElementById('lblStickerSize').innerText = Math.round(active.size) + 'px';
+        document.getElementById('lblStickerX').innerText = Math.round(active.x) + 'px';
+        document.getElementById('lblStickerY').innerText = Math.round(active.y) + 'px';
+      }
+    }
+
+    function selectSticker(id) {
+      state.selectedStickerId = id;
+      renderStickerListUI();
+    }
+
+    // Coordinate mouse mappate sullo spazio logico (indipendente dal 1080p/2K interno)
+    function getCanvasCoords(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) * (state.logicalW / rect.width),
+        y: (e.clientY - rect.top) * (state.logicalH / rect.height)
+      };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      const pos = getCanvasCoords(e);
+
+      for (let i = state.stickers.length - 1; i >= 0; i--) {
+        const s = state.stickers[i];
+        if (pos.x >= s.x - 8 && pos.x <= s.x + s.size + 8 &&
+            pos.y >= s.y - 8 && pos.y <= s.y + s.size + 8) {
+          selectSticker(s.id);
+          state.dragging = 'sticker';
+          state.dragOffsetX = pos.x - s.x;
+          state.dragOffsetY = pos.y - s.y;
+          return;
+        }
+      }
+
+      const dims = getSubjectDimensions();
+      if (pos.x >= state.subject.x && pos.x <= state.subject.x + dims.w &&
+          pos.y >= state.subject.y && pos.y <= state.subject.y + dims.h) {
+        state.dragging = 'subject';
+        state.dragOffsetX = pos.x - state.subject.x;
+        state.dragOffsetY = pos.y - state.subject.y;
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!state.dragging) return;
+      const pos = getCanvasCoords(e);
+
+      if (state.dragging === 'sticker') {
+        const st = state.stickers.find(s => s.id === state.selectedStickerId);
+        if (st) {
+          st.x = Math.max(0, Math.min(state.logicalW - st.size, pos.x - state.dragOffsetX));
+          st.y = Math.max(0, Math.min(state.logicalH - st.size, pos.y - state.dragOffsetY));
+          renderStickerListUI();
+        }
+      } else if (state.dragging === 'subject') {
+        state.subject.x = Math.round(pos.x - state.dragOffsetX);
+        state.subject.y = Math.round(pos.y - state.dragOffsetY);
+        document.getElementById('subXSlider').value = state.subject.x;
+        document.getElementById('subYSlider').value = state.subject.y;
+        document.getElementById('valX').innerText = state.subject.x + 'px';
+        document.getElementById('valY').innerText = state.subject.y + 'px';
+      }
+    });
+
+    window.addEventListener('mouseup', () => { state.dragging = null; });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const st = state.stickers.find(s => s.id === state.selectedStickerId);
+      if (st) {
+        const delta = e.deltaY < 0 ? 5 : -5;
+        st.size = Math.max(25, Math.min(180, st.size + delta));
+        renderStickerListUI();
+      }
+    }, { passive: false });
+
+    // AI MediaPipe con filtro Anti-Scalettatura (Feathering) e risoluzione piena del video originale
+    let segmenter = null;
+    if (window.SelfieSegmentation) {
+      segmenter = new window.SelfieSegmentation({
+        locateFile: (file) => "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/" + file
+      });
+      // modelSelection 1: Landscape/Full-HD high accuracy
+      segmenter.setOptions({ modelSelection: 1 });
+      segmenter.onResults((results) => {
+        if (results && results.segmentationMask) {
+          const w = fgVideo.videoWidth || 1280;
+          const h = fgVideo.videoHeight || 720;
+          if (aiCacheCanvas.width !== w || aiCacheCanvas.height !== h) {
+            aiCacheCanvas.width = w;
+            aiCacheCanvas.height = h;
+          }
+          aiCacheCtx.save();
+          aiCacheCtx.imageSmoothingEnabled = true;
+          aiCacheCtx.imageSmoothingQuality = 'high';
+          aiCacheCtx.clearRect(0, 0, w, h);
+
+          // Morbidezza bordi (Feathering) sulla maschera AI per eliminare i pixel scalettati
+          if (state.edgeFeather > 0) {
+            aiCacheCtx.filter = `blur(${state.edgeFeather}px)`;
+          }
+          aiCacheCtx.globalCompositeOperation = 'source-over';
+          aiCacheCtx.drawImage(results.segmentationMask, 0, 0, w, h);
+
+          aiCacheCtx.filter = 'none';
+          aiCacheCtx.globalCompositeOperation = 'source-in';
+          aiCacheCtx.drawImage(results.image, 0, 0, w, h);
+          aiCacheCtx.restore();
+          hasAiCache = true;
+        }
+        drawScene();
+      });
+    }
+
+    async function renderLoop() {
+      if (state.isPlaying) {
+        state.angle += 0.04;
+      } else {
+        if (!fgVideo.paused) fgVideo.pause();
+        if (!bgVideo.paused) bgVideo.pause();
+      }
+
+      updateTimelineUI();
+
+      if (state.mode !== 'demo' && state.isPlaying && !fgVideo.paused && !fgVideo.ended && fgVideo.readyState >= 2) {
+        if (state.removeBg && segmenter) {
+          await segmenter.send({ image: fgVideo });
+        } else {
+          drawScene();
+        }
+      } else {
+        drawScene();
+      }
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawScene() {
+      ctx.save();
+      // Abilita l'interpolazione bicubica hardware al massimo livello
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      // Scala l'intero sistema di coordinate in Full HD / 2K!
+      // Così i testi, le emoticon e i video vengono disegnati con la massima densità di pixel
+      ctx.scale(state.renderScale, state.renderScale);
+
+      const W = state.logicalW;
+      const H = state.logicalH;
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.filter = state.filter;
+
+      // 1. Disegna Sfondo in Alta Definizione
+      if (state.bgType === 'gradient') {
+        const grad = ctx.createLinearGradient(0, 0, W, H);
+        grad.addColorStop(0, '#4f46e5');
+        grad.addColorStop(0.5, '#9333ea');
+        grad.addColorStop(1, '#ec4899');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+      } else if (state.bgType === 'color') {
+        ctx.fillStyle = state.bgColor;
+        ctx.fillRect(0, 0, W, H);
+      } else if (state.bgType === 'image' && bgImage.complete && bgImage.naturalWidth) {
+        drawMediaWithAspectRatio(ctx, bgImage, bgImage.naturalWidth, bgImage.naturalHeight, W, H, state.bgFitMode);
+      } else if (state.bgType === 'video' && bgVideo.readyState >= 2) {
+        drawMediaWithAspectRatio(ctx, bgVideo, bgVideo.videoWidth, bgVideo.videoHeight, W, H, state.bgFitMode);
+      }
+
+      // 2. Disegna Soggetto in Alta Definizione
+      const dims = getSubjectDimensions();
+      const subW = dims.w;
+      const subH = dims.h;
+      const subX = state.subject.x;
+      const subY = state.subject.y;
+
+      if (state.mode === 'demo') {
+        ctx.save();
+        if (!state.removeBg) {
+          ctx.fillStyle = '#0f172a';
+          ctx.fillRect(subX, subY, subW, subH);
+          ctx.strokeStyle = '#475569';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(subX, subY, subW, subH);
+        }
+        const cx = subX + subW / 2 + Math.sin(state.angle) * (25 * state.subject.scale);
+        const cy = subY + subH / 2 + Math.cos(state.angle * 2) * (12 * state.subject.scale);
+        const factor = Math.min(subW, subH) / 260;
+        
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.arc(cx, cy - 22 * factor, 42 * factor, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#0284c7';
+        ctx.fillRect(cx - 55 * factor, cy + 25 * factor, 110 * factor, 80 * factor);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = "bold " + Math.max(10, Math.round(14 * factor)) + "px sans-serif";
+        ctx.textAlign = 'center';
+        ctx.fillText(state.removeBg ? "✨ Ultra HD Nitido!" : "Soggetto Demo HD", cx, cy + 70 * factor);
+        ctx.restore();
+      } else if (state.removeBg && hasAiCache) {
+        ctx.drawImage(aiCacheCanvas, subX, subY, subW, subH);
+      } else if (fgVideo.readyState >= 2) {
+        ctx.drawImage(fgVideo, subX, subY, subW, subH);
+      }
+
+      ctx.filter = 'none';
+
+      // 3. Disegna Sticker / Emoji (Vettoriali a risoluzione nativa 1080p/2K!)
+      state.stickers.forEach(s => {
+        ctx.font = s.size + "px sans-serif";
+        ctx.textBaseline = 'top';
+        ctx.fillText(s.content, s.x, s.y);
+        if (s.id === state.selectedStickerId && !isRecording) {
+          ctx.save();
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([5, 4]);
+          ctx.strokeRect(s.x - 6, s.y - 6, s.size + 12, s.size + 12);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(s.x + s.size + 2, s.y + s.size + 2, 8, 8);
+          ctx.restore();
+        }
+      });
+
+      // 4. Disegna Transizioni
+      if (state.transition.opacity > 0) {
+        ctx.fillStyle = state.transition.type === 'flash'
+          ? "rgba(255,255,255," + state.transition.opacity + ")"
+          : "rgba(0,0,0," + state.transition.opacity + ")";
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      ctx.restore();
+    }
+
+    async function toggleRemoveBg(val) {
+      state.removeBg = val;
+      if (val && state.mode !== 'demo' && segmenter && fgVideo.readyState >= 2) {
+        await segmenter.send({ image: fgVideo });
+      }
+    }
+
+    function updateSubject(prop, val) {
+      state.subject[prop] = parseFloat(val);
+      document.getElementById('valScale').innerText = Math.round(state.subject.scale * 100) + '%';
+      document.getElementById('valX').innerText = state.subject.x + 'px';
+      document.getElementById('valY').innerText = state.subject.y + 'px';
+    }
+    function setBgGradient() { state.bgType = 'gradient'; }
+    function setBgSolidColor(col) { state.bgType = 'color'; state.bgColor = col; }
+    function setFilter(f) { state.filter = f; }
+
+    function triggerTransition(type) {
+      state.transition.type = type;
+      state.transition.opacity = 1;
+      const timer = setInterval(() => {
+        state.transition.opacity -= 0.06;
+        if (state.transition.opacity <= 0) {
+          state.transition.opacity = 0;
+          clearInterval(timer);
+        }
+      }, 30);
+    }
+
+    function addSticker(emoji) {
+      const id = Date.now() + Math.floor(Math.random() * 1000);
+      const offset = (state.stickers.length * 20) % 100;
+      const newSticker = { id, content: emoji, x: 40 + offset, y: 50 + offset, size: 60 };
+      state.stickers.push(newSticker);
+      selectSticker(id);
+    }
+
+    function updateSticker(prop, val) {
+      const st = state.stickers.find(s => s.id === state.selectedStickerId);
+      if (st) {
+        st[prop] = parseInt(val);
+        renderStickerListUI();
+      }
+    }
+
+    function deleteActiveSticker() {
+      state.stickers = state.stickers.filter(s => s.id !== state.selectedStickerId);
+      if (state.stickers.length > 0) {
+        selectSticker(state.stickers[state.stickers.length - 1].id);
+      } else {
+        state.selectedStickerId = null;
+        renderStickerListUI();
+      }
+    }
+
+    function startDemo() {
+      if (fgVideo.srcObject) {
+        fgVideo.srcObject.getTracks().forEach(t => t.stop());
+        fgVideo.srcObject = null;
+      }
+      fgVideo.pause();
+      state.mode = 'demo';
+      state.isPlaying = true;
+      centerSubject();
+      updatePlayBtnUI();
+      document.getElementById('modeBadge').innerText = '✨ Modalità Demo Attiva';
+    }
+
+    async function startWebcam() {
+      try {
+        // Richiedi la Webcam direttamente in Full HD 1080p!
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 } } 
+        });
+        fgVideo.srcObject = stream;
+        fgVideo.play();
+        state.mode = 'webcam';
+        state.isPlaying = true;
+        hasAiCache = false;
+        fgVideo.onloadedmetadata = () => centerSubject();
+        updatePlayBtnUI();
+        document.getElementById('modeBadge').innerText = '📷 Webcam Live Full HD Attiva';
+      } catch (e) {
+        alert("Per usare la webcam scarica il file sul Mac con l'icona di Download in alto a destra e aprilo in Chrome!");
+      }
+    }
+
+    function handleFgUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      ensureAudioMixer();
+      if (fgVideo.srcObject) {
+        fgVideo.srcObject.getTracks().forEach(t => t.stop());
+        fgVideo.srcObject = null;
+      }
+      hasAiCache = false;
+      fgVideo.src = URL.createObjectURL(file);
+      fgVideo.onloadedmetadata = () => {
+        centerSubject();
+        document.getElementById('exportDurationMode').value = 'full';
+      };
+      fgVideo.play();
+      state.mode = 'video';
+      state.isPlaying = true;
+      if (state.bgType === 'video' && bgVideo.src) bgVideo.play();
+      updatePlayBtnUI();
+      document.getElementById('modeBadge').innerText = `🎬 Soggetto: ${file.name}`;
+    }
+
+    function handleBgUpload(e, type) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      state.bgType = type;
+      if (type === 'image') bgImage.src = url;
+      if (type === 'video') {
+        bgVideo.src = url;
+        bgVideo.onloadedmetadata = () => {
+          document.getElementById('modeBadge').innerText = 
+            `🎞️ Sfondo (${bgVideo.videoWidth}x${bgVideo.videoHeight}) - Renderizzato in Full HD!`;
+        };
+        if (state.isPlaying) bgVideo.play();
+        else bgVideo.pause();
+      }
+    }
+
+    function playSound(type) {
+      ensureAudioMixer();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      gain.connect(audioDest);
+      const now = audioCtx.currentTime;
+      if (type === 'ding') {
+        osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); osc.frequency.exponentialRampToValueAtTime(1400, now + 0.12);
+        gain.gain.setValueAtTime(0.4, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.7);
+        osc.start(now); osc.stop(now + 0.7);
+      } else if (type === 'laser') {
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(900, now); osc.frequency.exponentialRampToValueAtTime(80, now + 0.35);
+        gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.start(now); osc.stop(now + 0.35);
+      } else {
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(160, now); osc.frequency.exponentialRampToValueAtTime(35, now + 0.45);
+        gain.gain.setValueAtTime(0.6, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+        osc.start(now); osc.stop(now + 0.45);
+      }
+    }
+
+    // Inizializza subito a 1080p Full HD!
+    applyCanvasResolution();
+    renderStickerListUI();
+    requestAnimationFrame(renderLoop);
+  </script>
+</body>
+</html>
