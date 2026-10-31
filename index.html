@@ -3,16 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>StudioFX ULTRA HD - Video Editor AI Online</title>
-  <!-- Meta Tag per condivisione su WhatsApp, Telegram, Social -->
+  <title>StudioFX ULTRA HD - Video Editor AI + Studio Audio Mixer</title>
   <meta property="og:title" content="StudioFX ULTRA HD - Video Editor AI">
-  <meta property="og:description" content="Monta video online in Full HD/2K con rimozione sfondo AI, effetti, sticker e filtri. Compatibile con Mac, PC, iPhone e Android.">
+  <meta property="og:description" content="Monta video online in Full HD/2K con rimozione sfondo AI, Microfono Live, Voiceover, effetti, sticker e filtri.">
   <meta property="og:type" content="website">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
   <style>
-    /* FIX SAFARI CRITICO: Safari congela i video se hanno display:none (hidden).
-       Usiamo invece 1x1px con opacità 0 fuori schermo così Safari decodifica sempre i frame a 60fps! */
+    /* FIX SAFARI CRITICO: mantiene attivi i flussi video/audio senza display:none */
     .safari-media-fix {
       position: fixed;
       top: -9999px;
@@ -27,9 +25,9 @@
 </head>
 <body class="bg-slate-950 text-white h-screen flex flex-col font-sans overflow-hidden select-none">
 
-  <!-- Media attivi per Safari e Chrome (Senza display:none e senza crossorigin che blocca i file locali su Safari) -->
+  <!-- Media sorgenti -->
   <video id="fgVideo" class="safari-media-fix" loop playsinline webkit-playsinline></video>
-  <video id="bgVideo" class="safari-media-fix" loop muted playsinline webkit-playsinline></video>
+  <video id="bgVideo" class="safari-media-fix" loop playsinline webkit-playsinline></video>
   <img id="bgImage" class="safari-media-fix" alt="bg" />
 
   <!-- MODAL DI ANTEPRIMA E DOWNLOAD VIDEO ESPORTATO -->
@@ -38,7 +36,7 @@
       <div class="w-full flex justify-between items-center border-b border-slate-800 pb-2 mb-2.5">
         <div class="flex items-center gap-2">
           <span class="text-base">🎉</span>
-          <h2 class="font-bold text-xs text-white">Video Ultra HD Pronto!</h2>
+          <h2 class="font-bold text-xs text-white">Video + Audio Studio Pronto!</h2>
           <span id="exportFormatBadge" class="text-[10px] bg-emerald-600 px-2 py-0.5 rounded-full font-bold">MP4 1080p</span>
         </div>
         <button onclick="closeExportModal()" class="text-slate-400 hover:text-white text-xs px-2 py-0.5 rounded bg-slate-800 cursor-pointer">✕ Chiudi</button>
@@ -70,7 +68,7 @@
   <header class="h-11 border-b border-slate-800 px-3 flex items-center justify-between bg-slate-900 shrink-0">
     <div class="flex items-center gap-1.5">
       <span class="text-base">🎬</span>
-      <span class="font-bold text-xs tracking-wide">StudioFX <span class="text-[9px] bg-gradient-to-r from-blue-600 to-purple-600 px-1.5 py-0.5 rounded-full">SAFARI + CHROME HD</span></span>
+      <span class="font-bold text-xs tracking-wide">StudioFX <span class="text-[9px] bg-gradient-to-r from-blue-600 to-purple-600 px-1.5 py-0.5 rounded-full">PRO AUDIO</span></span>
 
       <!-- FORMATO -->
       <div class="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800 ml-1 gap-0.5">
@@ -94,10 +92,21 @@
       </div>
     </div>
 
-    <!-- PULSANTI RAPIDI + REGISTRAZIONE IN ALTO A DESTRA -->
+    <!-- PULSANTI WEBCAM, MICROFONO CON VU-METER E REGISTRAZIONE -->
     <div class="flex items-center gap-1.5">
       <button onclick="startDemo()" class="bg-purple-600/80 hover:bg-purple-500 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer">✨ Demo</button>
-      <button onclick="startWebcam()" class="bg-emerald-600/80 hover:bg-emerald-500 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer">📷 Webcam</button>
+      <button onclick="startWebcam()" class="bg-emerald-600/80 hover:bg-emerald-500 px-2 py-1 rounded text-[11px] font-semibold cursor-pointer">📷 Webcam + Mic</button>
+      
+      <!-- Pulsante Microfono Rapido + Barra Volume Live -->
+      <div class="flex items-center bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 gap-1.5">
+        <button id="topMicBtn" onclick="toggleMicrophone()" class="text-[11px] font-semibold text-slate-300 hover:text-white cursor-pointer flex items-center gap-1">
+          <span>🎙️ Mic: OFF</span>
+        </button>
+        <div class="w-10 h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div id="topMicMeter" class="h-full bg-emerald-400 transition-all duration-75" style="width: 0%;"></div>
+        </div>
+      </div>
+
       <button id="topExportBtn" onclick="toggleExport()" class="bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer shadow">
         🔴 Registra / Esporta
       </button>
@@ -110,6 +119,39 @@
     <!-- PANNELLO SINISTRO -->
     <aside class="w-64 border-r border-slate-800 bg-slate-900/60 p-2.5 overflow-y-auto space-y-2.5 shrink-0">
       
+      <!-- MIXER AUDIO & MICROFONO -->
+      <div class="bg-slate-900 p-2.5 rounded-xl border border-emerald-500/30">
+        <div class="flex items-center justify-between mb-1.5">
+          <h3 class="text-[11px] font-bold text-emerald-400 uppercase">🎙️ Mixer Audio & Microfono</h3>
+          <button id="sideMicBtn" onclick="toggleMicrophone()" class="bg-slate-800 hover:bg-slate-700 text-[10px] px-2 py-0.5 rounded font-bold text-slate-300 cursor-pointer">
+            Attiva Mic
+          </button>
+        </div>
+
+        <!-- VU Meter Microfono Live -->
+        <div class="mb-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
+          <div class="flex justify-between text-[9px] text-slate-400 mb-1">
+            <span id="micStatusText">Microfono spento</span>
+            <span id="micLevelPercent">0%</span>
+          </div>
+          <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div id="sideMicMeter" class="h-full bg-gradient-to-r from-emerald-500 via-lime-400 to-amber-400 transition-all duration-75" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Volumi separati -->
+        <div class="space-y-1 text-[10px]">
+          <div class="flex justify-between"><span>🎙️ Volume Voce (Mic):</span> <span id="lblMicGain">100%</span></div>
+          <input type="range" min="0" max="2" step="0.05" value="1" oninput="setAudioGain('mic', this.value)" class="w-full accent-emerald-500 h-1" />
+
+          <div class="flex justify-between"><span>🎬 Volume Video Soggetto:</span> <span id="lblFgGain">100%</span></div>
+          <input type="range" min="0" max="1.5" step="0.05" value="1" oninput="setAudioGain('fg', this.value)" class="w-full accent-blue-500 h-1" />
+
+          <div class="flex justify-between"><span>🎞️ Volume Video Sfondo:</span> <span id="lblBgGain">0% (Muto)</span></div>
+          <input type="range" min="0" max="1.5" step="0.05" value="0" oninput="setAudioGain('bg', this.value)" class="w-full accent-purple-500 h-1" />
+        </div>
+      </div>
+
       <!-- 1. Soggetto & AI -->
       <div class="bg-slate-900 p-2.5 rounded-xl border border-slate-800">
         <h3 class="text-[11px] font-bold text-blue-400 uppercase mb-1.5">1. Soggetto & AI Eraser HD</h3>
@@ -121,7 +163,7 @@
         <div class="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-800 mb-1.5">
           <div>
             <p class="text-[11px] font-semibold">AI Background Eraser</p>
-            <p id="aiStatusLabel" class="text-[9px] text-emerald-400">🟢 Compatibile Safari & Chrome</p>
+            <p class="text-[9px] text-emerald-400">🟢 Compatibile Safari & Chrome</p>
           </div>
           <input type="checkbox" id="removeBgToggle" onchange="toggleRemoveBg(this.checked)" class="w-4 h-4 accent-blue-600 rounded cursor-pointer" />
         </div>
@@ -181,7 +223,7 @@
         </div>
       </div>
 
-      <!-- 3. Effetti & Transizioni (Compatibili anche con Safari!) -->
+      <!-- 3. Effetti & Transizioni -->
       <div class="bg-slate-900 p-2.5 rounded-xl border border-slate-800">
         <h3 class="text-[11px] font-bold text-emerald-400 uppercase mb-1.5">3. Filtri & Transizioni</h3>
         <div class="grid grid-cols-2 gap-1 mb-1.5">
@@ -254,7 +296,7 @@
         </button>
       </div>
 
-      <span id="modeBadge" class="mt-1 text-[10px] text-slate-400">✨ Modalità Demo Attiva (Compatibile Safari, Chrome, iOS)</span>
+      <span id="modeBadge" class="mt-1 text-[10px] text-slate-400">✨ Modalità Demo Attiva (Attiva "📷 Webcam + Mic" o "🎙️ Mic" per parlare!)</span>
     </main>
 
     <!-- PANNELLO DESTRO -->
@@ -297,13 +339,11 @@
 
   <script>
     const canvas = document.getElementById('editorCanvas');
-    // FIX SAFARI: niente desynchronized:true perché su WebKit macOS/iOS causa sfarfallio o schermo nero
     const ctx = canvas.getContext('2d', { alpha: false });
     const fgVideo = document.getElementById('fgVideo');
     const bgVideo = document.getElementById('bgVideo');
     const bgImage = document.getElementById('bgImage');
 
-    // Canvas ausiliario per creare l'effetto Sfocatura (Blur) su Safari anche senza ctx.filter!
     const blurHelperCanvas = document.createElement('canvas');
     blurHelperCanvas.width = 36;
     blurHelperCanvas.height = 36;
@@ -314,13 +354,26 @@
     let hasAiCache = false;
     let isAiBusy = false;
 
+    // --- ARCHITETTURA STUDIO AUDIO MIXER + MICROFONO ---
     let activeRecorder = null;
     let isRecording = false;
     let recInterval = null;
     let recStartTime = 0;
+
     let audioCtx = null;
-    let audioDest = null;
+    let audioDest = null; // Destinazione finale registrata nel file MP4
     let fgAudioSource = null;
+    let bgAudioSource = null;
+    let fgGainNode = null;
+    let bgGainNode = null;
+
+    // Nodi Microfono
+    let micStream = null;
+    let micSourceNode = null;
+    let micGainNode = null;
+    let micAnalyser = null;
+    let micDataArray = null;
+    let isMicActive = false;
 
     let lastExportBlob = null;
     let lastExportExt = 'mp4';
@@ -336,11 +389,12 @@
       logicalH: 270,
       renderScale: 4,
       bitrate: 16000000,
+      gains: { mic: 1.0, fg: 1.0, bg: 0.0 },
       subject: { x: 60, y: 30, scale: 0.75 },
       bgType: 'gradient',
       bgFitMode: 'blur',
       bgColor: '#0f172a',
-      filter: 'none', // 'none', 'bw', 'vintage', 'cyberpunk'
+      filter: 'none',
       transition: { type: 'none', opacity: 0 },
       stickers: [
         { id: 1, content: '🔥', x: 150, y: 25, size: 50 },
@@ -352,6 +406,158 @@
       dragOffsetX: 0,
       dragOffsetY: 0
     };
+
+    // Inizializza il Mixer Audio a 3 canali (Microfono + Video Soggetto + Video Sfondo + Effetti Sonori)
+    function ensureAudioMixer() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        audioCtx = new AudioContextClass();
+        if (audioCtx.createMediaStreamDestination) {
+          audioDest = audioCtx.createMediaStreamDestination();
+        }
+
+        // Canale 1: Video Soggetto
+        try {
+          fgAudioSource = audioCtx.createMediaElementSource(fgVideo);
+          fgGainNode = audioCtx.createGain();
+          fgGainNode.gain.value = state.gains.fg;
+          fgAudioSource.connect(fgGainNode);
+          fgGainNode.connect(audioCtx.destination); // Si sente nelle casse
+          if (audioDest) fgGainNode.connect(audioDest); // Va nel file registrato
+        } catch (e) {}
+
+        // Canale 2: Video Sfondo
+        try {
+          bgAudioSource = audioCtx.createMediaElementSource(bgVideo);
+          bgGainNode = audioCtx.createGain();
+          bgGainNode.gain.value = state.gains.bg;
+          bgAudioSource.connect(bgGainNode);
+          bgGainNode.connect(audioCtx.destination);
+          if (audioDest) bgGainNode.connect(audioDest);
+        } catch (e) {}
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(()=>{});
+      }
+    }
+
+    // Regola il volume di Microfono, Video Soggetto o Video Sfondo
+    function setAudioGain(channel, val) {
+      ensureAudioMixer();
+      const num = parseFloat(val);
+      state.gains[channel] = num;
+      const pct = Math.round(num * 100) + '%';
+
+      if (channel === 'mic') {
+        document.getElementById('lblMicGain').innerText = pct;
+        if (micGainNode) micGainNode.gain.value = num;
+      } else if (channel === 'fg') {
+        document.getElementById('lblFgGain').innerText = pct;
+        if (fgGainNode && state.mode !== 'webcam') fgGainNode.gain.value = num;
+      } else if (channel === 'bg') {
+        document.getElementById('lblBgGain').innerText = num === 0 ? '0% (Muto)' : pct;
+        bgVideo.muted = (num === 0);
+        if (bgGainNode) bgGainNode.gain.value = num;
+      }
+    }
+
+    // Attiva o Disattiva il Microfono (con Cancellazione Eco e Anti-Feedback Loop!)
+    async function toggleMicrophone(forceStream = null) {
+      ensureAudioMixer();
+
+      // Se stiamo spegnendo il microfono (e non ci è stato passato uno stream dalla webcam)
+      if (isMicActive && !forceStream) {
+        if (micStream) {
+          micStream.getAudioTracks().forEach(t => t.stop());
+        }
+        if (micSourceNode) {
+          try { micSourceNode.disconnect(); } catch (e) {}
+        }
+        isMicActive = false;
+        updateMicUI(false);
+        return;
+      }
+
+      try {
+        // Usa lo stream della webcam se già include l'audio, altrimenti chiedi il microfono dedicato
+        if (forceStream && forceStream.getAudioTracks().length > 0) {
+          micStream = forceStream;
+        } else {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true
+            }
+          });
+        }
+
+        if (micSourceNode) {
+          try { micSourceNode.disconnect(); } catch (e) {}
+        }
+
+        micSourceNode = audioCtx.createMediaStreamSource(micStream);
+        micGainNode = audioCtx.createGain();
+        micGainNode.gain.value = state.gains.mic;
+
+        micAnalyser = audioCtx.createAnalyser();
+        micAnalyser.fftSize = 256;
+        micDataArray = new Uint8Array(micAnalyser.frequencyBinCount);
+
+        micSourceNode.connect(micGainNode);
+        micGainNode.connect(micAnalyser);
+
+        // IMPORTANTE: Colleghiamo il microfono SOLO a audioDest (il registratore MP4)
+        // e NON a audioCtx.destination (le casse del Mac), così non fischia mai mentre parli!
+        if (audioDest) {
+          micGainNode.connect(audioDest);
+        }
+
+        isMicActive = true;
+        updateMicUI(true);
+      } catch (err) {
+        alert("Impossibile accedere al Microfono. Verifica i permessi di Safari/Chrome!");
+      }
+    }
+
+    function updateMicUI(active) {
+      const topBtn = document.getElementById('topMicBtn');
+      const sideBtn = document.getElementById('sideMicBtn');
+      const statusTxt = document.getElementById('micStatusText');
+
+      if (active) {
+        topBtn.innerHTML = '<span class="text-emerald-400 font-bold">🎙️ Mic: ON</span>';
+        sideBtn.innerText = 'Spegni Mic';
+        sideBtn.className = 'bg-emerald-600 hover:bg-emerald-500 text-[10px] px-2 py-0.5 rounded font-bold text-white cursor-pointer';
+        statusTxt.innerText = '🟢 Microfono attivo (In registrazione)';
+        statusTxt.className = 'text-emerald-400 font-semibold';
+      } else {
+        topBtn.innerHTML = '<span>🎙️ Mic: OFF</span>';
+        sideBtn.innerText = 'Attiva Mic';
+        sideBtn.className = 'bg-slate-800 hover:bg-slate-700 text-[10px] px-2 py-0.5 rounded font-bold text-slate-300 cursor-pointer';
+        statusTxt.innerText = 'Microfono spento';
+        statusTxt.className = 'text-slate-400';
+        document.getElementById('topMicMeter').style.width = '0%';
+        document.getElementById('sideMicMeter').style.width = '0%';
+        document.getElementById('micLevelPercent').innerText = '0%';
+      }
+    }
+
+    // Aggiorna la barra luminosa del volume microfono (VU Meter)
+    function updateMicMeterUI() {
+      if (!isMicActive || !micAnalyser || !micDataArray) return;
+      micAnalyser.getByteFrequencyData(micDataArray);
+      let sum = 0;
+      for (let i = 0; i < micDataArray.length; i++) {
+        sum += micDataArray[i];
+      }
+      const avg = sum / micDataArray.length;
+      const level = Math.min(100, Math.round((avg / 90) * 100 * state.gains.mic));
+      document.getElementById('topMicMeter').style.width = level + '%';
+      document.getElementById('sideMicMeter').style.width = level + '%';
+      document.getElementById('micLevelPercent').innerText = level + '%';
+    }
 
     function applyCanvasResolution() {
       const tier = state.qualityTier;
@@ -429,31 +635,11 @@
       document.getElementById('valEdgeBlur').innerText = val + 'px';
     }
 
-    function ensureAudioMixer() {
-      if (!audioCtx) {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) return;
-        audioCtx = new AudioContextClass();
-        if (audioCtx.createMediaStreamDestination) {
-          audioDest = audioCtx.createMediaStreamDestination();
-        }
-        try {
-          fgAudioSource = audioCtx.createMediaElementSource(fgVideo);
-          fgAudioSource.connect(audioCtx.destination);
-          if (audioDest) fgAudioSource.connect(audioDest);
-        } catch (e) {}
-      }
-      if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume().catch(()=>{});
-      }
-    }
-
     function toggleExport() {
       if (isRecording) stopExportRecording();
       else startExportRecording();
     }
 
-    // ESPORTAZIONE UNIVERSALE (Safari MP4 + Chrome MP4/WebM)
     function startExportRecording() {
       if (!window.MediaRecorder) {
         alert("Il tuo browser non supporta MediaRecorder. Aggiorna Safari o usa Chrome!");
@@ -478,15 +664,14 @@
 
       if (!state.isPlaying) togglePlay();
 
-      // Safari e Chrome supportano entrambi captureStream
       const canvasStream = canvas.captureStream ? canvas.captureStream(fps) : canvas.webkitCaptureStream(fps);
       const combinedTracks = [...canvasStream.getVideoTracks()];
+      // Aggiunge il mix audio completo (Microfono + Video Soggetto + Video Sfondo + Sound FX!)
       if (audioDest && audioDest.stream && audioDest.stream.getAudioTracks().length > 0) {
         combinedTracks.push(...audioDest.stream.getAudioTracks());
       }
       const finalStream = new MediaStream(combinedTracks);
 
-      // Ordine di priorità codec compatibile sia con Safari (video/mp4) che con Chrome
       const mimeTypes = [
         'video/mp4',
         'video/mp4;codecs=avc1',
@@ -504,11 +689,10 @@
 
       const chunks = [];
       try {
-        const options = { videoBitsPerSecond: state.bitrate };
+        const options = { videoBitsPerSecond: state.bitrate, audioBitsPerSecond: 320000 };
         if (selectedMime) options.mimeType = selectedMime;
         activeRecorder = new MediaRecorder(finalStream, options);
       } catch (err) {
-        // Fallback puro per Safari iOS/macOS se rifiuta opzioni extra
         activeRecorder = new MediaRecorder(finalStream);
       }
 
@@ -634,7 +818,6 @@
       document.getElementById('valY').innerText = state.subject.y + 'px';
     }
 
-    // Disegna lo sfondo con Blur Hardware universale (Funziona anche su Safari dove ctx.filter non esiste!)
     function drawMediaWithAspectRatio(ctx, media, srcW, srcH, destW, destH, mode) {
       if (!srcW || !srcH) return;
       const srcRatio = srcW / srcH;
@@ -653,11 +836,8 @@
       } else {
         if (mode === 'blur') {
           ctx.save();
-          // Tecnica Downscale-Upscale universale: disegna il frame rimpicciolito su un micro-canvas 36x36
-          // e lo ri-espande con interpolazione bicubica. Produce una sfocatura fluida sia su Safari che su Chrome!
           blurHelperCtx.drawImage(media, 0, 0, blurHelperCanvas.width, blurHelperCanvas.height);
           ctx.drawImage(blurHelperCanvas, -10, -10, destW + 20, destH + 20);
-          // Velo scuro per far risaltare il video centrale
           ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
           ctx.fillRect(0, 0, destW, destH);
           ctx.restore();
@@ -792,7 +972,6 @@
       renderStickerListUI();
     }
 
-    // Supporto sia Mouse (Mac/PC) che Touch (Safari iPhone/iPad)
     function getPointerCoords(e) {
       const rect = canvas.getBoundingClientRect();
       const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
@@ -867,7 +1046,6 @@
       }
     }, { passive: false });
 
-    // AI MediaPipe con protezione anti-blocco per Safari WebGL
     let segmenter = null;
     if (window.SelfieSegmentation) {
       try {
@@ -904,9 +1082,7 @@
           }
           drawScene();
         });
-      } catch (err) {
-        console.warn("MediaPipe init error:", err);
-      }
+      } catch (err) {}
     }
 
     async function renderLoop() {
@@ -918,6 +1094,7 @@
       }
 
       updateTimelineUI();
+      updateMicMeterUI();
 
       if (state.mode !== 'demo' && state.isPlaying && !fgVideo.paused && !fgVideo.ended && fgVideo.readyState >= 2) {
         if (state.removeBg && segmenter && !isAiBusy) {
@@ -938,12 +1115,10 @@
       requestAnimationFrame(renderLoop);
     }
 
-    // Applica Filtri Colore Universali (Funziona sia su Chrome che su Safari grazie ai Composite Operations!)
     function applySafariCompatibleFilter(ctx, W, H, filterName) {
       if (filterName === 'none') return;
       ctx.save();
       if (filterName === 'bw') {
-        // Desaturazione totale universale (funziona anche su Safari iOS/macOS!)
         ctx.globalCompositeOperation = 'saturation';
         ctx.fillStyle = 'hsl(0, 0%, 50%)';
         ctx.fillRect(0, 0, W, H);
@@ -1033,7 +1208,6 @@
         ctx.drawImage(fgVideo, subX, subY, subW, subH);
       }
 
-      // Applica Filtri Cinematografici compatibili con Safari & Chrome
       applySafariCompatibleFilter(ctx, W, H, state.filter);
 
       // 3. Disegna Sticker / Emoji
@@ -1137,21 +1311,51 @@
       document.getElementById('modeBadge').innerText = '✨ Modalità Demo Attiva';
     }
 
+    // Avvia Webcam + Microfono Integrato (Senza Effetto Eco/Larsen!)
     async function startWebcam() {
       try {
+        ensureAudioMixer();
         const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { width: { ideal: 1920 }, height: { ideal: 1080 } } 
+          video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
         });
+
+        // Mutiamo l'elemento <video> diretto e il nodo fgGainNode così la voce della webcam
+        // non esce dalle casse del Mac mentre parli, ma viene registrata dal nodo Microfono!
+        fgVideo.muted = true;
+        if (fgGainNode) fgGainNode.gain.value = 0;
+
         fgVideo.srcObject = stream;
         await fgVideo.play();
+
+        // Collega automaticamente la traccia microfono della webcam al Mixer di registrazione e al VU Meter!
+        await toggleMicrophone(stream);
+
         state.mode = 'webcam';
         state.isPlaying = true;
         hasAiCache = false;
         centerSubject();
         updatePlayBtnUI();
-        document.getElementById('modeBadge').innerText = '📷 Webcam Live Full HD Attiva';
+        document.getElementById('modeBadge').innerText = '📷 Webcam Full HD + 🎙️ Microfono Studio Attivi!';
       } catch (e) {
-        alert("Permesso Webcam negato o non disponibile. Assicurati di aprire il link https://studiofx-video-editor.vercel.app/");
+        // Se l'utente nega il microfono ma accetta la webcam, riprova solo video
+        try {
+          const vStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          fgVideo.muted = true;
+          fgVideo.srcObject = vStream;
+          await fgVideo.play();
+          state.mode = 'webcam';
+          state.isPlaying = true;
+          centerSubject();
+          updatePlayBtnUI();
+          document.getElementById('modeBadge').innerText = '📷 Webcam Attiva (Senza Microfono)';
+        } catch (err2) {
+          alert("Permesso Webcam/Microfono negato. Verifica le impostazioni del browser!");
+        }
       }
     }
 
@@ -1164,9 +1368,13 @@
         fgVideo.srcObject = null;
       }
       hasAiCache = false;
+      // Riattiva l'audio del video caricato!
+      fgVideo.muted = false;
+      if (fgGainNode) fgGainNode.gain.value = state.gains.fg;
+
       const url = URL.createObjectURL(file);
       fgVideo.src = url;
-      fgVideo.load(); // Importante per Safari!
+      fgVideo.load();
       fgVideo.onloadeddata = () => {
         centerSubject();
         document.getElementById('exportDurationMode').value = 'full';
@@ -1182,17 +1390,19 @@
     function handleBgUpload(e, type) {
       const file = e.target.files[0];
       if (!file) return;
+      ensureAudioMixer();
       const url = URL.createObjectURL(file);
       state.bgType = type;
       if (type === 'image') {
         bgImage.src = url;
       }
       if (type === 'video') {
+        bgVideo.muted = (state.gains.bg === 0);
         bgVideo.src = url;
-        bgVideo.load(); // Importante per Safari!
+        bgVideo.load();
         bgVideo.onloadeddata = () => {
           document.getElementById('modeBadge').innerText = 
-            `🎞️ Sfondo (${bgVideo.videoWidth}x${bgVideo.videoHeight}) - Compatibile Safari & Chrome!`;
+            `🎞️ Sfondo (${bgVideo.videoWidth}x${bgVideo.videoHeight}) Caricato!`;
           if (state.isPlaying) bgVideo.play().catch(()=>{});
           else bgVideo.pause();
         };
